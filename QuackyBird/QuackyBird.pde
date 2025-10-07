@@ -3,12 +3,11 @@ import java.util.Random;
 Random random;
 //states
 final int STATE_LOADING = 0;
-final int STATE_MENU = 1;
-final int STATE_READY = 2;
-final int STATE_PLAY = 3;
-final int STATE_GAMEOVER = 4;
-final int STATE_GAMEWIN = 5;
-final int STATE_BIRD_SELECT = 6;
+final int STATE_READY = 1;
+final int STATE_PLAY = 2;
+final int STATE_GAMEOVER = 3;
+final int STATE_GAMEWIN = 4;
+final int STATE_BIRD_SELECT = 5;
 
 int gameState = STATE_LOADING;
 int currentMap = 1; //1 for map1, 2 for map2, etc
@@ -49,7 +48,7 @@ int birdY;
 int birdWidth = 40;
 int birdHeight = 40;
 int hOffset = 10;
-int vOffset = 6;
+int vOffset = 10;
 Bird[] birds; //bird types
 int currentIndex = 0; //current bird type
 PImage[] birdSilhouettes; //for loading screen
@@ -79,7 +78,7 @@ int restartDelay = 400; //half a second
 //gameWin stuff
 int winTime = 0;
 int nextMapDelay = 400;
-int scoreToWin = 5;
+int scoreToWin = 2;
 
 //game logic
 Bird bird;
@@ -197,6 +196,30 @@ void setup() { //---------------------------------------------------------------
 
   placePipes();
   lastPipeX = width;
+}
+
+PImage createSilhouetteFirstFrame(PImage spriteSheet, int totalFrames) {
+  int frameWidth = spriteSheet.width / totalFrames;
+  int frameHeight = spriteSheet.height;
+
+  // Extract first frame only (x=0)
+  PImage firstFrame = spriteSheet.get(0, 0, frameWidth, frameHeight);
+
+  // Create silhouette image same size as first frame
+  PImage silhouette = createImage(frameWidth, frameHeight, ARGB);
+  firstFrame.loadPixels();
+  silhouette.loadPixels();
+
+  for (int i = 0; i < firstFrame.pixels.length; i++) {
+    if (alpha(firstFrame.pixels[i]) > 0) {
+      silhouette.pixels[i] = color(0, 0, 0, alpha(firstFrame.pixels[i]));
+    } else {
+      silhouette.pixels[i] = color(0, 0);
+    }
+  }
+  silhouette.updatePixels();
+
+  return silhouette;
 }
 
 boolean collision(Bird a, Pipe b) { //if this returns true, it means collision happened.
@@ -342,9 +365,6 @@ void draw() { //----------------------------------------------------------------
   case STATE_BIRD_SELECT:
     drawBirdSelection();
     break;
-  case STATE_MENU:
-    drawMenu();
-    break;
   case STATE_READY:
     drawMapSuspended();
     break;
@@ -370,29 +390,7 @@ void draw() { //----------------------------------------------------------------
     break;
   }
 }
-PImage createSilhouetteFirstFrame(PImage spriteSheet, int totalFrames) {
-  int frameWidth = spriteSheet.width / totalFrames;
-  int frameHeight = spriteSheet.height;
 
-  // Extract first frame only (x=0)
-  PImage firstFrame = spriteSheet.get(0, 0, frameWidth, frameHeight);
-
-  // Create silhouette image same size as first frame
-  PImage silhouette = createImage(frameWidth, frameHeight, ARGB);
-  firstFrame.loadPixels();
-  silhouette.loadPixels();
-
-  for (int i = 0; i < firstFrame.pixels.length; i++) {
-    if (alpha(firstFrame.pixels[i]) > 0) {
-      silhouette.pixels[i] = color(0, 0, 0, alpha(firstFrame.pixels[i]));
-    } else {
-      silhouette.pixels[i] = color(0, 0);
-    }
-  }
-  silhouette.updatePixels();
-
-  return silhouette;
-}
 
 
 void resetGame() {
@@ -413,22 +411,18 @@ void drawLoading() {
   text("Loading...", width/2, height/2);
   gameState = STATE_BIRD_SELECT;
 }
-void drawMenu() {
-  background(50, 150, 200);
-  fill(255);
-  textSize(32);
-  textAlign(CENTER, CENTER);
-  text("Quacky Bird\nPress Spacebar to play", width/2, height/2);
-}
 void drawBirdSelection() {
-  background(100, 150, 220);
+  background(211, 175, 55);
   fill(255);
   textSize(32);
   textAlign(CENTER, CENTER);
-  text("Choose Your Bird", width/2, height/6);
+  text("Cluck Jumper", width/2, height/6);
+  //controls
+  textSize(25);
+  text("Choose Your Bird", width/2, height/6 + 40);
 
-  int spacing = 120;
-  int startX = width/2 - spacing;
+  int spacing = 100;
+  int startX = width/2 - spacing - 25;
   int silhouetteY = height/2;
 
   textSize(20);
@@ -458,6 +452,11 @@ void drawBirdSelection() {
 
   fill(255);
   text("Use LEFT/RIGHT to select, \nSPACE to confirm", width/2, silhouetteY + birdHeight + 80);
+  textAlign(LEFT, CENTER);
+  text("Controls: ", 30, silhouetteY + birdHeight + 80 + 60);
+  text("Spacebar to Jump", 50, silhouetteY + birdHeight + 80 + 60 + 25);
+  text("X to small jump (useful for map 3)", 50, silhouetteY + birdHeight + 80 + 60 + 50);
+  text("M to open this Menu again", 50, silhouetteY + birdHeight + 80 + 60 + 75);
 }
 
 
@@ -490,7 +489,7 @@ void drawGameOver() {
 }
 
 void drawGameWin() {
-  fill(255, 0, 0);  //
+  fill(255, 215, 0);  //
   textSize(48);
   textAlign(CENTER, CENTER);
   text("Round Won!", width / 2, height / 2 - 40);
