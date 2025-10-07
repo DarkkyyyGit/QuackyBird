@@ -7,9 +7,12 @@ final int STATE_MENU = 1;
 final int STATE_READY = 2;
 final int STATE_PLAY = 3;
 final int STATE_GAMEOVER = 4;
+final int STATE_GAMEWIN = 5;
+final int STATE_BIRD_SELECT = 6;
 
 int gameState = STATE_LOADING;
 int currentMap = 1; //1 for map1, 2 for map2, etc
+int maxMap = 3;
 //images
 PImage bgImg;
 PImage bgImg2;
@@ -49,6 +52,9 @@ int hOffset = 10;
 int vOffset = 6;
 Bird[] birds; //bird types
 int currentIndex = 0; //current bird type
+PImage[] birdSilhouettes; //for loading screen
+boolean[] birdUnlocked = {true, false, false}; //only first bird is unlocked
+String[] birdNames = {"Egg", "Chick", "Chicken"};
 
 //Pipes
 int pipeX;
@@ -69,6 +75,11 @@ boolean gameOver = false;
 double score = 0;
 int deathTime = 0; //stores millis() when bird dies
 int restartDelay = 400; //half a second
+
+//gameWin stuff
+int winTime = 0;
+int nextMapDelay = 400;
+int scoreToWin = 5;
 
 //game logic
 Bird bird;
@@ -174,6 +185,12 @@ void setup() { //---------------------------------------------------------------
   birds[1] = new Bird(spriteSheetChick, 4, 5, birdX, birdY, birdWidth, birdHeight); //chick
   birds[2] = new Bird(spriteSheetChicken, 4, 5, birdX, birdY, birdWidth, birdHeight); //chicken
 
+  //create bird solloutes for game menu
+  birdSilhouettes = new PImage[birds.length];
+  for (int i = 0; i < birds.length; i++) {
+    birdSilhouettes[i] = createSilhouetteFirstFrame(birds[i].spriteSheet, birds[i].totalFrames);
+  }
+
   //objects
   bird = birds[currentIndex];
   pipes = new ArrayList<Pipe>();
@@ -261,18 +278,21 @@ void move() {
       score+= 1;
     }
 
-
     if (collision(bird, topPipe)) {
       if (gameState != STATE_GAMEOVER) {
         gameState = STATE_GAMEOVER;
         deathTime = millis(); //record death time here
       }
     }
-    if (collision(bird, bottomPipe)) { //MAKE MORE EFFECIENT LATER******************************************************************************************
+    if (collision(bird, bottomPipe)) {
       if (gameState != STATE_GAMEOVER) {
         gameState = STATE_GAMEOVER;
         deathTime = millis(); //record death time here
       }
+    }
+    if (gameState == STATE_PLAY && score >= scoreToWin) { //round won
+      gameState = STATE_GAMEWIN;
+      winTime = millis(); //record win time here
     }
   }
 }
@@ -306,6 +326,8 @@ void drawGameObjects(boolean doUpdate) {
   textSize(40);
   if (gameState == STATE_GAMEOVER) {
     drawGameOver();
+  } else if (gameState == STATE_GAMEWIN) {
+    drawGameWin();
   } else if (gameState == STATE_PLAY) {
     textAlign(LEFT, BASELINE);
     text((int)score, 10, 35);
@@ -316,6 +338,9 @@ void draw() { //----------------------------------------------------------------
   switch (gameState) {
   case STATE_LOADING:
     drawLoading();
+    break;
+  case STATE_BIRD_SELECT:
+    drawBirdSelection();
     break;
   case STATE_MENU:
     drawMenu();
@@ -329,6 +354,13 @@ void draw() { //----------------------------------------------------------------
     else if (currentMap == 3) drawMap3(true);
     // Add more maps if needed
     break;
+  case STATE_GAMEWIN:
+    //Draw game objects frozen for the selected map
+    if (currentMap == 1) drawMap1(false);
+    else if (currentMap ==2 ) drawMap2(false);
+    else if (currentMap == 3) drawMap3(false);
+    drawGameWin();
+    break;
   case STATE_GAMEOVER:
     //Draw game objects frozen for the selected map
     if (currentMap == 1) drawMap1(false);
@@ -338,6 +370,31 @@ void draw() { //----------------------------------------------------------------
     break;
   }
 }
+PImage createSilhouetteFirstFrame(PImage spriteSheet, int totalFrames) {
+  int frameWidth = spriteSheet.width / totalFrames;
+  int frameHeight = spriteSheet.height;
+
+  // Extract first frame only (x=0)
+  PImage firstFrame = spriteSheet.get(0, 0, frameWidth, frameHeight);
+
+  // Create silhouette image same size as first frame
+  PImage silhouette = createImage(frameWidth, frameHeight, ARGB);
+  firstFrame.loadPixels();
+  silhouette.loadPixels();
+
+  for (int i = 0; i < firstFrame.pixels.length; i++) {
+    if (alpha(firstFrame.pixels[i]) > 0) {
+      silhouette.pixels[i] = color(0, 0, 0, alpha(firstFrame.pixels[i]));
+    } else {
+      silhouette.pixels[i] = color(0, 0);
+    }
+  }
+  silhouette.updatePixels();
+
+  return silhouette;
+}
+
+
 void resetGame() {
   pipes.clear();
   bird = birds[currentIndex];
@@ -354,15 +411,56 @@ void drawLoading() {
   textSize(40);
   textAlign(CENTER, CENTER);
   text("Loading...", width/2, height/2);
-  gameState = STATE_MENU;
+  gameState = STATE_BIRD_SELECT;
 }
 void drawMenu() {
   background(50, 150, 200);
   fill(255);
   textSize(32);
   textAlign(CENTER, CENTER);
-  text("Quacky Bird\nPress 1,2 or 3 for Map", width/2, height/2);
+  text("Quacky Bird\nPress Spacebar to play", width/2, height/2);
 }
+void drawBirdSelection() {
+  background(100, 150, 220);
+  fill(255);
+  textSize(32);
+  textAlign(CENTER, CENTER);
+  text("Choose Your Bird", width/2, height/6);
+
+  int spacing = 120;
+  int startX = width/2 - spacing;
+  int silhouetteY = height/2;
+
+  textSize(20);
+  textAlign(CENTER, BASELINE);
+
+  for (int i = 0; i < birds.length; i++) {
+    int x = startX + i * spacing;
+
+    if (birdUnlocked[i]) {
+      image(birds[i].frames[0], x, silhouetteY, birdWidth, birdHeight);
+      fill(255);
+      text(birdNames[i], x + birdWidth/2, silhouetteY + birdHeight + 25);
+    } else {
+      image(birdSilhouettes[i], x, silhouetteY, birdWidth, birdHeight);
+      text("???", x + birdWidth/2, silhouetteY + birdHeight + 25);
+    }
+
+    // Highlight selected bird
+    if (i == currentIndex) {
+      noFill();
+      stroke(255, 255, 0);
+      strokeWeight(4);
+      rect(x, silhouetteY, birdWidth, birdHeight);
+      noStroke();
+    }
+  }
+
+  fill(255);
+  text("Use LEFT/RIGHT to select, \nSPACE to confirm", width/2, silhouetteY + birdHeight + 80);
+}
+
+
 void drawMapSuspended() {
   background(0);
   if (currentMap == 1) displayMap1();
@@ -391,35 +489,62 @@ void drawGameOver() {
   text("Press Space to Restart", width / 2, height / 2 + 40);
 }
 
+void drawGameWin() {
+  fill(255, 0, 0);  //
+  textSize(48);
+  textAlign(CENTER, CENTER);
+  text("Round Won!", width / 2, height / 2 - 40);
+
+  fill(255);  // white color for instructions
+  textSize(32);
+  text("Score: " + (int)score, width / 2, height / 2);
+
+  textSize(24);
+  text("Press Space to go to next round", width / 2, height / 2 + 40);
+}
 void keyPressed() {
-  if (gameState == STATE_MENU) {
-    if (key == '1') {
-      currentMap = 1;
-      currentIndex = 0;
-      resetGame();
-      gameState = STATE_READY;
-    }
-    if (key == '2') {
-      currentMap = 2;
-      currentIndex = 1;
-      resetGame();
-      gameState = STATE_READY;
-    }
-    if (key == '3') {
-      currentMap = 3;
-      currentIndex = 2;
-      resetGame();
-      gameState = STATE_READY;
+  if (key == 'm') gameState = STATE_BIRD_SELECT;
+  if (gameState == STATE_BIRD_SELECT) {
+    if (keyCode == LEFT) {
+      currentIndex = max(0, currentIndex - 1);
+    } else if (keyCode == RIGHT) {
+      currentIndex = min(birdSilhouettes.length - 1, currentIndex + 1);
+    } else if (key == ' ') { //confrim selection
+      if (birdUnlocked[currentIndex]) {
+        bird = birds[currentIndex]; // Set selected bird
+        currentMap = 1;
+        resetGame();
+        gameState = STATE_READY; // Or STATE_READY
+      }
     }
   } else if (gameState == STATE_READY && key == ' ') {
     gameState = STATE_PLAY;
     velocityY = -10; //bird jumps up to start flying
-  } else if (gameState == STATE_PLAY && key == ' ') {
-    velocityY = -12;
-  } else if (gameState == STATE_GAMEOVER) {
+  } else if (gameState == STATE_PLAY) {
+    if (key == ' ') velocityY = -12; //normal jump
+    if (key == 'x') velocityY = -8; //small jump
+  } else if (gameState == STATE_GAMEWIN) { //game win
+    if (key == ' ' && millis() - winTime > nextMapDelay) {
+      currentMap ++;
+      resetGame();
+      if (currentMap > maxMap) {
+        //Entire game finished, unlock next bird
+        for (int i = 0; i < birdUnlocked.length - 1; i++) {
+          if (birdUnlocked[i] && !birdUnlocked[i+1]) {
+            birdUnlocked[i+1] = true;
+            break;
+          }
+        }
+        gameState = STATE_BIRD_SELECT;
+      } else { //player won entire game
+        resetGame();
+        gameState = STATE_READY;
+      }
+    }
+  } else if (gameState == STATE_GAMEOVER) { //game over
     if (key == ' ' && millis() - deathTime > restartDelay) {
-      gameState = STATE_MENU;
-      //gameOver = false;
+      resetGame();
+      gameState = STATE_READY;
     }
   }
 }
